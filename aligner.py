@@ -1,8 +1,8 @@
 import numpy as np
 
 
-def collides(a, b, i, j):
-  return (a <= i <= b) or (a <= j <= b)
+def collides(a_st, a_ed, b_st, b_ed):
+  return (a_st <= b_st <= a_ed) or (a_st <= b_ed <= a_ed)
     
 class Aligner:
   def __init__(self, similarity_matrix):
