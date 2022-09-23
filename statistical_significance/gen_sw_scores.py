@@ -1,7 +1,10 @@
+import sys
+sys.path.append('../../alignment_tool')
+
 import glob
 from tqdm import tqdm
 import pandas as pd
-from align_piepeline import align_sequences
+from align_pipeline import align_sequences
 import os
 import xml.etree.ElementTree as ET
 
