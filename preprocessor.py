@@ -5,8 +5,11 @@ from scipy import stats
 from scipy.special import expit, logit
 from sentence_transformers import SentenceTransformer
 from sentence_transformers import util
+from sklearn.feature_extraction.text import TfidfVectorizer
+import copy
 from tqdm import tqdm
 import torch
+import torchtext
 
 DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
 nlp = spacy.load("en_core_web_sm")
@@ -32,12 +35,18 @@ class Preprocessor:
     	tokens_of_A = tokens_of_A[:clip_length]
     	tokens_of_B = tokens_of_B[:clip_length]
     self.sbert = None
+    self.glove = None
     self.threshold = threshold
     self.valid_token_sizes = ["character", "word", "sentence", "paragraph", "page", "book_unit", "chapter", "embedding"]
     self.tokens_of_A = tokens_of_A
     self.tokens_of_B = tokens_of_B
     assert (token_size_of_A in self.valid_token_sizes and token_size_of_B in self.valid_token_sizes)
     self.similarity_matrix = self.get_similarity_matrix(tokens_of_A, tokens_of_B, token_size_of_A, token_size_of_B, threshold, similarity_config)
+
+  def init_glove(self):
+    glove_embedding_dim = 300
+    self.glove = torchtext.vocab.GloVe(name="840B", 
+                              dim= glove_embedding_dim) 
 
   def init_sbert(self):
     print("loading sbert")
@@ -147,7 +156,7 @@ class Preprocessor:
           self.raw_sim_matrix = self.tf_idf_sim(tokens_of_A, tokens_of_B)
       elif sim_config['sim'] == 'overlapping_glove_sim' : 
           self.raw_sim_matrix = self.overlapping_glove_sim(tokens_of_A, tokens_of_B)
-      elif sim_config['sim'] == 'hamming' : 
+      elif sim_config['sim'] == 'hamming_sim' : 
           self.raw_sim_matrix = self.hamming_sim(tokens_of_A, tokens_of_B)
       
       else:
@@ -158,8 +167,8 @@ class Preprocessor:
 
   def tf_idf_sim(self, tokens_of_A, tokens_of_B):
       vectorizer = TfidfVectorizer(stop_words = {'english'})
-      all_tokens = copy.deepcopy(tokens_of_A)
-      all_tokens.extend(tokens_of_B)
+      all_tokens = list(copy.deepcopy(tokens_of_A))
+      all_tokens.extend(list(tokens_of_B))
       vectorizer = vectorizer.fit(all_tokens)
       
       tf_idf_A = vectorizer.transform(tokens_of_A).todense()
@@ -175,14 +184,14 @@ class Preprocessor:
 
   def get_glove_embedding(self, tokens):
     ret = [[],[]]
-    for token in tokens:
+    for token in tqdm(tokens):
       doc = nlp(token.lower())
       mean_emb = torch.zeros(300)
       max_emb = torch.zeros(300)
       min_emb = torch.ones(300) * 1e9
       for word in doc:
         if word.text not in all_stopwords and word.text.isalnum():
-          cur = glove[word.text] 
+          cur = self.glove[word.text] 
           mean_emb += cur 
           max_emb = torch.max(max_emb, cur)
           min_emb = torch.min(min_emb, cur)
@@ -201,6 +210,7 @@ class Preprocessor:
     return ret
 
   def glove_embedding_sim(self, tokens_of_A, tokens_of_B):
+      self.init_glove()
       glove_A = self.get_glove_embedding(tokens_of_A)
       glove_B = self.get_glove_embedding(tokens_of_B)
       #print(type(glove_A[0]), type(glove_B[1]))
@@ -211,7 +221,7 @@ class Preprocessor:
         ret = util.cos_sim(glove_A[i], glove_B[i])
         ret_np.append(ret.detach().cpu().numpy())  
       
-      return ret_np 
+      return np.array(ret_np[0]) 
 
   def sbert_embedding_sim(self, tokens_of_A, tokens_of_B):
     if self.sbert is None:
@@ -353,7 +363,7 @@ class Preprocessor:
       for (i, token_B) in enumerate(tokens_of_B):
           words_multisets_B.append(self.get_words_multiset(token_B))
           
-      for (i, token_A) in enumerate(tokens_of_A):
+      for (i, token_A) in tqdm(enumerate(tokens_of_A)):
           #print(i)
           for (j, token_B) in enumerate(tokens_of_B):
               sim_matrix[i][j] = self.get_jaccard_similarity(words_multisets_A[i], words_multisets_B[j])
@@ -382,7 +392,7 @@ class Preprocessor:
     for i, unit_A in enumerate(seq_A):
       st = break_points[i]
       ed = break_points[i+1]
-      if unit_A in seq_B[st:ed]:
+      if unit_A in set(seq_B[st:ed]):
         match_count += 1
     return match_count / len(seq_A)
 
@@ -401,7 +411,6 @@ class Preprocessor:
     for (i, seq_A) in tqdm(enumerate(seq_A_list)):
       for (j, seq_B) in enumerate(seq_B_list):
         sim_matrix[i][j] = self._get_hamming_sim_seq(seq_A, seq_B)
-      print(i)
     return sim_matrix
 
   def get_gloves_multiset(self, token):

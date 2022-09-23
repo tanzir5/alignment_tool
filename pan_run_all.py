@@ -128,6 +128,8 @@ if __name__ == "__main__":
         resultdir = sys.argv[4]
         if resultdir[-1] != "/":
             resultdir+="/"
+        if os.path.exists(resultdir) == False:
+            os.mkdir(resultdir)
         lines = open(sys.argv[1], 'r').readlines()
         for line in tqdm(lines):
             susp, src = line.split()
