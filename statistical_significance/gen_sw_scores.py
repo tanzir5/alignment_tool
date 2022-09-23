@@ -8,7 +8,7 @@ import xml.etree.ElementTree as ET
 
 def update_sw_csv(book1, book2, score, path='sw_scores.csv'):
   df = pd.DataFrame({'book1':book1, 'book2':book2, 'score':score})
-  df.to_csv('path', mode=’a’, index=False, header=False)
+  df.to_csv('path', mode='a', index=False, header=False)
 
 def get_seq(book_id):
   path = '/home/allekim/stonybook_data_guten/' + book_id + "/" + 'header_annotated.xml'
