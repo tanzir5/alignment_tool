@@ -1,18 +1,37 @@
-import numpy as np 
-import seaborn as sns
-import matplotlib.pyplot as plt
-def k_largest_index_argsort(a, k):
-    idx = np.argsort(a.ravel())[:-k-1:-1]
-    return np.column_stack(np.unravel_index(idx, a.shape))
+import align_pipeline 
+import numpy as np
+from aligner import Aligner
 
-#waterman_matrix = np.random.rand(4000, 3000)
+def test_aligner():
+  # testing alignment from similarity matrix
+  r = 10
+  c = 12
+  sim_matrix = np.random.rand(r, c)
+  #sim_matrix[2][11] = 200
+  #sim_matrix[3][5] = 5
+  #sim_matrix[4][6] = 4
+  aligner = Aligner(sim_matrix)
+  aligner.smith_waterman(no_gap=True)
+  matches, e1, e2 = aligner.global_alignment()
+  print(e1, e2)
 
-seq_A = np.random.rand(13)
-seq_B = np.random.rand(200)
-window_len = len(seq_B) / len(seq_A)
-break_points = np.arange(0, len(seq_B), window_len)
-for i in range(len(break_points)):
-  break_points[i] = int(round(break_points[i]))
-print(window_len)
-print(len(break_points))
-print(break_points)
+def test_align_pipeline():
+  #testing alignment from embedding and thresholds 
+  mean = 0.093
+  sigma = 0.088
+  seq1 = np.random.rand(10, 768)
+  seq2 = np.random.rand(12, 768)
+  aligner = align_pipeline.align_sequences(
+                seq1, seq2, 
+                unit1='embedding', 
+                unit2='embedding', 
+                z_thresh=1,
+                similarity_config={'mean':mean,'std':sigma},
+                ignore=[set(), set()]
+                ) 
+  aligner.smith_waterman(no_gap=True)
+  matches, e1, e2 = aligner.global_alignment()
+  print(e1, e2)
+
+#test_align_pipeline()
+test_aligner()

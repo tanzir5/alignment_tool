@@ -17,20 +17,21 @@ def align_sequences(
                     sim='sbert', 
                     norm='sigmoid',
                     z_thresh=4,
-                    clip=-1
-                    ):
-  similarity_config = {}
-  similarity_config['sim'] = args.sim
+                    clip=-1,
+                    similarity_config={},
+                    ignore=[set(), set()]
+                    ): 
+  similarity_config['sim'] = sim
   if norm == 'sigmoid':
     similarity_config['normalization'] = 'z_normalize_with_sigmoid'
 
   preprocessor = Preprocessor(seq1, seq2, 
                               token_size_of_A = unit1,
                               token_size_of_B = unit2,
-                              threshold = float(args.z_thresh),
+                              threshold = float(z_thresh),
                               similarity_config = similarity_config,
                               clip_length = clip)
 
-  aligner = Aligner(preprocessor.similarity_matrix)
+  aligner = Aligner(preprocessor.similarity_matrix, ignore)
   aligner.smith_waterman()
-  return aligner.dp
+  return aligner

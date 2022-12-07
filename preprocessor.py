@@ -37,7 +37,8 @@ class Preprocessor:
     self.sbert = None
     self.glove = None
     self.threshold = threshold
-    self.valid_token_sizes = ["character", "word", "sentence", "paragraph", "page", "book_unit", "chapter", "embedding"]
+    self.valid_token_sizes = ["character", "word", "sentence", "paragraph", "page", 
+                              "book_unit", "chapter", "embedding", "embedding_dir"]
     self.tokens_of_A = tokens_of_A
     self.tokens_of_B = tokens_of_B
     assert (token_size_of_A in self.valid_token_sizes and token_size_of_B in self.valid_token_sizes)
@@ -53,27 +54,43 @@ class Preprocessor:
     self.sbert = SentenceTransformer('msmarco-distilbert-cos-v5').to(DEVICE)
     print("loading done")
 
+  def load_sbert_embedding(self, path):
+    if os.path.exists(path):
+      embs = np.load(path)
+      return embs
+    else:
+      raise Exception(path + " does not exist.") 
+
   def get_similarity_matrix(self, tokens_of_A, tokens_of_B, token_size_of_A, token_size_of_B, threshold, similarity_config):
-  	if token_size_of_A == 'character':
+    if token_size_of_A == 'embedding_dir':
+      if token_size_of_B == 'embedding_dir':
+        tokens_of_A = self.load_sbert_embedding(tokens_of_A)
+        tokens_of_B = self.load_sbert_embedding(tokens_of_B)
+        token_size_of_A = 'embedding'
+        token_size_of_B = 'embedding'
+      else:
+        return ['error']
+    
+    if token_size_of_A == 'character':
   	    if token_size_of_B == 'character':
   	        return self.get_similarity_matrix_char_char(tokens_of_A, tokens_of_B, similarity_config)
   	    else:
   	        return ['error']
-  	elif token_size_of_A == 'word':
+    elif token_size_of_A == 'word':
   	    if token_size_of_B == 'word':
   	        return self.get_similarity_matrix_word_word(tokens_of_A, tokens_of_B, similarity_config)
   	    else:
   	        return ['error']
-  	elif token_size_of_A == 'embedding':
+    elif token_size_of_A == 'embedding':
   	    if token_size_of_B == 'embedding':
   	        sim = util.cos_sim(tokens_of_A, tokens_of_B)
   	        #sim = util.dot_score(tokens_of_A, tokens_of_B)
   	        self.raw_sim_matrix = sim.detach().cpu().numpy()  
-  	        return self.normalize(self.raw_sim_matrix, threshold, similarity_config)
+  	        return self.normalize(self.raw_sim_matrix, similarity_config)
   	    else:
   	        print("ERROR: A is embedding, B must be embedding instead of", tokens_size_of_B)
   	        return ['error']
-  	else:
+    else:
   	    if token_size_of_B != 'character' and token_size_of_B != 'word': 
   	        return self.get_similarity_matrix_text_text(tokens_of_A, tokens_of_B, similarity_config)
   	    else:
@@ -144,7 +161,7 @@ class Preprocessor:
       if sim_config == None:
           self.raw_sim_matrix = self.overlapping_token_similarity_matrix(tokens_of_A, tokens_of_B)
           return self.raw_sim_matrix
-      elif sim_config['sim'] == 'overlapping_token_similarity_matrix':
+      elif sim_config['sim'] in ['overlapping_token_similarity_matrix', 'jaccard', 'jaccard_sim']:
           self.raw_sim_matrix = self.overlapping_token_similarity_matrix(tokens_of_A, tokens_of_B)
       elif sim_config['sim'] == 'bert_embedding_sim':
           self.raw_sim_matrix = self.bert_embedding_sim(tokens_of_A, tokens_of_B)
